@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>户型图透视矫正工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 3px dashed #ddd;
+            border-radius: 10px;
+            padding: 50px 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #fafafa;
+        }
+
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8ecff;
+        }
+
+        .upload-icon {
+            font-size: 4em;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .image-section {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .image-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .image-panel {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 20px;
+            background: #fafafa;
+        }
+
+        .image-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .controls {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .control-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .control-row .control-group {
+            flex: 1;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .corner-info {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .instructions {
+            background: #e7f3ff;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .instructions h4 {
+            color: #004085;
+            margin-bottom: 10px;
+        }
+
+        .instructions ul {
+            margin-left: 20px;
+            color: #004085;
+        }
+
+        .instructions li {
+            margin-bottom: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .image-container {
+                flex-direction: column;
+            }
+            
+            .control-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 户型图透视矫正工具</h1>
+            <p>自动检测并矫正户型图的透视变形，让您的户型图更加标准化</p>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📸</div>
+                    <div class="upload-text">点击或拖拽上传户型图</div>
+                    <button class="btn">选择文件</button>
+                </div>
+                <input type="file" class="file-input" id="fileInput" accept="image/*">
+            </div>
+
+            <div class="image-section" id="imageSection">
+                <div class="image-container">
+                    <div class="image-panel">
+                        <h3>📷 原始图像</h3>
+                        <div class="canvas-container">
+                            <canvas id="originalCanvas"></canvas>
+                        </div>
+                        <div class="corner-info">
+                            <strong>检测到的角点坐标：</strong>
+                            <div id="cornerCoords">等待图像上传...</div>
+                        </div>
+                    </div>
+
+                    <div class="image-panel">
+                        <h3>✨ 矫正结果</h3>
+                        <div class="canvas-container">
+                            <canvas id="correctedCanvas"></canvas>
+                        </div>
+                        <button class="btn" id="downloadBtn" style="margin-top: 15px; display: none;">下载矫正图像</button>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="control-row">
+                        <div class="control-group">
+                            <label>输出宽度 (像素)</label>
+                            <input type="number" id="targetWidth" value="800" min="100" max="2000">
+                        </div>
+                        <div class="control-group">
+                            <label>输出高度 (像素)</label>
+                            <input type="number" id="targetHeight" value="600" min="100" max="2000">
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <button class="btn" id="correctBtn" disabled>开始透视矫正</button>
+                    </div>
+
+                    <div class="status" id="status" style="display: none;"></div>
+                </div>
+
+                <div class="instructions">
+                    <h4>📋 使用说明：</h4>
+                    <ul>
+                        <li>支持 JPG、PNG 等常见图像格式</li>
+                        <li>系统会自动检测户型图的四个角点</li>
+                        <li>您可以在原始图像上点击调整角点位置</li>
+                        <li>调整输出尺寸后点击"开始透视矫正"</li>
+                        <li>矫正完成后可下载标准化的户型图</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PerspectiveCorrectionApp {
+            constructor() {
+                this.currentFileId = null;
+                this.corners = [];
+                this.originalImage = null;
+                this.imageScale = 1;
+                
+                this.initializeElements();
+                this.bindEvents();
+            }
+
+            initializeElements() {
+                this.uploadArea = document.getElementById('uploadArea');
+                this.fileInput = document.getElementById('fileInput');
+                this.imageSection = document.getElementById('imageSection');
+                this.originalCanvas = document.getElementById('originalCanvas');
+                this.correctedCanvas = document.getElementById('correctedCanvas');
+                this.cornerCoords = document.getElementById('cornerCoords');
+                this.targetWidth = document.getElementById('targetWidth');
+                this.targetHeight = document.getElementById('targetHeight');
+                this.correctBtn = document.getElementById('correctBtn');
+                this.downloadBtn = document.getElementById('downloadBtn');
+                this.status = document.getElementById('status');
+                
+                this.originalCtx = this.originalCanvas.getContext('2d');
+                this.correctedCtx = this.correctedCanvas.getContext('2d');
+            }
+
+            bindEvents() {
+                // 文件上传事件
+                this.uploadArea.addEventListener('click', () => this.fileInput.click());
+                this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                
+                // 拖拽上传
+                this.uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.add('dragover');
+                });
+                
+                this.uploadArea.addEventListener('dragleave', () => {
+                    this.uploadArea.classList.remove('dragover');
+                });
+                
+                this.uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.uploadFile(files[0]);
+                    }
+                });
+                
+                // 画布点击事件（调整角点）
+                this.originalCanvas.addEventListener('click', (e) => this.handleCanvasClick(e));
+                
+                // 矫正按钮
+                this.correctBtn.addEventListener('click', () => this.correctPerspective());
+                
+                // 下载按钮
+                this.downloadBtn.addEventListener('click', () => this.downloadImage());
+            }
+
+            handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.uploadFile(file);
+                }
+            }
+
+            async uploadFile(file) {
+                if (!file.type.startsWith('image/')) {
+                    this.showStatus('error', '请选择有效的图像文件');
+                    return;
+                }
+
+                this.showStatus('loading', '正在上传和处理图像...');
+                
+                const formData = new FormData();
+                formData.append('image', file);
+
+                try {
+                    const response = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        this.currentFileId = result.file_id;
+                        this.corners = result.corners;
+                        await this.displayOriginalImage(result.image_base64, result.image_size);
+                        this.updateCornerDisplay();
+                        this.showImageSection();
+                        this.correctBtn.disabled = false;
+                        this.showStatus('success', '图像上传成功，已自动检测角点');
+                    } else {
+                        this.showStatus('error', result.error || '上传失败');
+                    }
+                } catch (error) {
+                    this.showStatus('error', '网络错误：' + error.message);
+                }
+            }
+
+            async displayOriginalImage(base64Data, imageSize) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.originalImage = img;
+                        
+                        // 设置画布尺寸，保持宽高比
+                        const maxWidth = 400;
+                        const maxHeight = 300;
+                        const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+                        
+                        this.originalCanvas.width = img.width * ratio;
+                        this.originalCanvas.height = img.height * ratio;
+                        this.imageScale = ratio;
+                        
+                        // 绘制图像
+                        this.originalCtx.drawImage(img, 0, 0, this.originalCanvas.width, this.originalCanvas.height);
+                        
+                        // 绘制角点
+                        this.drawCorners();
+                        
+                        resolve();
+                    };
+                    img.src = 'data:image/jpeg;base64,' + base64Data;
+                });
+            }
+
+            drawCorners() {
+                // 重新绘制图像
+                this.originalCtx.drawImage(this.originalImage, 0, 0, this.originalCanvas.width, this.originalCanvas.height);
+                
+                // 绘制角点和连线
+                this.originalCtx.strokeStyle = '#ff0000';
+                this.originalCtx.fillStyle = '#ff0000';
+                this.originalCtx.lineWidth = 2;
+                
+                // 绘制连线
+                this.originalCtx.beginPath();
+                for (let i = 0; i < this.corners.length; i++) {
+                    const x = this.corners[i][0] * this.imageScale;
+                    const y = this.corners[i][1] * this.imageScale;
+                    
+                    if (i === 0) {
+                        this.originalCtx.moveTo(x, y);
+                    } else {
+                        this.originalCtx.lineTo(x, y);
+                    }
+                }
+                this.originalCtx.closePath();
+                this.originalCtx.stroke();
+                
+                // 绘制角点
+                this.corners.forEach((corner, index) => {
+                    const x = corner[0] * this.imageScale;
+                    const y = corner[1] * this.imageScale;
+                    
+                    this.originalCtx.beginPath();
+                    this.originalCtx.arc(x, y, 5, 0, 2 * Math.PI);
+                    this.originalCtx.fill();
+                    
+                    // 标注角点序号
+                    this.originalCtx.fillStyle = '#ffffff';
+                    this.originalCtx.font = '12px Arial';
+                    this.originalCtx.fillText(index + 1, x - 3, y + 4);
+                    this.originalCtx.fillStyle = '#ff0000';
+                });
+            }
+
+            handleCanvasClick(event) {
+                const rect = this.originalCanvas.getBoundingClientRect();
+                const x = (event.clientX - rect.left) / this.imageScale;
+                const y = (event.clientY - rect.top) / this.imageScale;
+                
+                // 找到最近的角点
+                let minDistance = Infinity;
+                let closestCornerIndex = 0;
+                
+                this.corners.forEach((corner, index) => {
+                    const distance = Math.sqrt(Math.pow(x - corner[0], 2) + Math.pow(y - corner[1], 2));
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestCornerIndex = index;
+                    }
+                });
+                
+                // 如果点击位置距离角点足够近，更新角点位置
+                if (minDistance < 50) {
+                    this.corners[closestCornerIndex] = [x, y];
+                    this.drawCorners();
+                    this.updateCornerDisplay();
+                }
+            }
+
+            updateCornerDisplay() {
+                const cornerTexts = this.corners.map((corner, index) => 
+                    `角点${index + 1}: (${Math.round(corner[0])}, ${Math.round(corner[1])})`
+                );
+                this.cornerCoords.innerHTML = cornerTexts.join('<br>');
+            }
+
+            showImageSection() {
+                this.imageSection.style.display = 'block';
+            }
+
+            async correctPerspective() {
+                if (!this.currentFileId || this.corners.length !== 4) {
+                    this.showStatus('error', '请先上传图像并确保有4个角点');
+                    return;
+                }
+
+                this.showStatus('loading', '正在进行透视矫正...');
+                this.correctBtn.disabled = true;
+
+                try {
+                    const response = await fetch('/api/correct', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            file_id: this.currentFileId,
+                            corners: this.corners,
+                            target_width: parseInt(this.targetWidth.value),
+                            target_height: parseInt(this.targetHeight.value)
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        await this.displayCorrectedImage(result.corrected_image_base64);
+                        this.outputFilename = result.output_file;
+                        this.downloadBtn.style.display = 'inline-block';
+                        this.showStatus('success', '透视矫正完成！');
+                    } else {
+                        this.showStatus('error', result.error || '矫正失败');
+                    }
+                } catch (error) {
+                    this.showStatus('error', '网络错误：' + error.message);
+                } finally {
+                    this.correctBtn.disabled = false;
+                }
+            }
+
+            async displayCorrectedImage(base64Data) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.correctedCanvas.width = img.width;
+                        this.correctedCanvas.height = img.height;
+                        this.correctedCtx.drawImage(img, 0, 0);
+                        resolve();
+                    };
+                    img.src = 'data:image/jpeg;base64,' + base64Data;
+                });
+            }
+
+            downloadImage() {
+                if (this.outputFilename) {
+                    window.open(`/api/download/${this.outputFilename}`, '_blank');
+                }
+            }
+
+            showStatus(type, message) {
+                this.status.className = `status ${type}`;
+                this.status.textContent = message;
+                this.status.style.display = 'block';
+                
+                if (type === 'success' || type === 'error') {
+                    setTimeout(() => {
+                        this.status.style.display = 'none';
+                    }, 5000);
+                }
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new PerspectiveCorrectionApp();
+        });
+    </script>
+</body>
+</html>
