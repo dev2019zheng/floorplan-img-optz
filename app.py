@@ -190,23 +190,115 @@ class PerspectiveCorrector:
         
         return None
     
+    def detect_room_candidates(self, image):
+        """检测户型图中的房间候选区域"""
+        # 转换为灰度图
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        h, w = gray.shape
+        
+        # 自适应直方图均衡化增强对比度
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        gray = clahe.apply(gray)
+        
+        # 高斯模糊减少噪声
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        
+        # 自适应阈值二值化
+        binary = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                      cv2.THRESH_BINARY_INV, 11, 2)
+        
+        # 形态学操作连接断开的线条
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel_close, iterations=2)
+        
+        # 填充小的空洞
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel_open)
+        
+        # 查找轮廓
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        room_candidates = []
+        img_area = h * w
+        
+        for contour in contours:
+            # 计算轮廓面积
+            area = cv2.contourArea(contour)
+            
+            # 过滤太小或太大的轮廓
+            if area < img_area * 0.05 or area > img_area * 0.8:
+                continue
+            
+            # 计算轮廓的矩形度
+            x, y, rw, rh = cv2.boundingRect(contour)
+            rect_area = rw * rh
+            rectangularity = area / rect_area if rect_area > 0 else 0
+            
+            # 只保留相对矩形的区域
+            if rectangularity < 0.3:
+                continue
+            
+            # 多边形近似
+            epsilon = 0.02 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, True)
+            
+            # 如果近似后不是4个点，尝试更严格的近似
+            if len(approx) != 4:
+                epsilon = 0.05 * cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+            
+            # 仍然不是4个点，尝试用最小外接矩形
+            if len(approx) != 4:
+                rect = cv2.minAreaRect(contour)
+                box = cv2.boxPoints(rect)
+                approx = np.int0(box)
+            
+            if len(approx) >= 4:
+                # 如果有多于4个点，使用前4个或最小外接矩形
+                if len(approx) > 4:
+                    rect = cv2.minAreaRect(contour)
+                    box = cv2.boxPoints(rect)
+                    corners = np.float32(box)
+                else:
+                    corners = approx.reshape(4, 2).astype(np.float32)
+                
+                # 计算房间质量分数（面积 + 矩形度）
+                quality_score = area * rectangularity
+                
+                room_candidates.append({
+                    'corners': self.order_points(corners),
+                    'area': area,
+                    'rectangularity': rectangularity,
+                    'quality_score': quality_score,
+                    'center': (x + rw//2, y + rh//2)
+                })
+        
+        # 按质量分数排序
+        room_candidates.sort(key=lambda x: x['quality_score'], reverse=True)
+        
+        # 返回前5个最佳候选
+        return room_candidates[:5]
+    
     def detect_corners_auto_with_debug(self, image):
         """带调试信息的角点检测"""
         h, w = image.shape[:2]
         detection_info = {
             'method_used': 'fallback',
-            'green_detection': False,
+            'room_candidates': [],
             'contours_found': 0,
             'debug_message': ''
         }
         
-        # 方法1：颜色过滤检测绿色线条
-        corners = self.detect_green_frame(image)
-        if corners is not None:
+        # 方法1：房间检测
+        room_candidates = self.detect_room_candidates(image)
+        if room_candidates:
+            # 选择最佳房间（第一个，面积最大的）
+            best_room = room_candidates[0]
+            corners = best_room['corners']
             detection_info.update({
-                'method_used': 'green_detection',
-                'green_detection': True,
-                'debug_message': '成功检测到绿色线框'
+                'method_used': 'room_detection',
+                'room_candidates': room_candidates,
+                'debug_message': f'检测到{len(room_candidates)}个候选房间'
             })
             return corners, detection_info
         

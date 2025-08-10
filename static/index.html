@@ -272,6 +272,39 @@
             margin-bottom: 5px;
         }
 
+        .room-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        
+        .room-item {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #f8f9fa;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+        
+        .room-item:hover {
+            border-color: #007bff;
+            background: #e3f2fd;
+        }
+        
+        .room-item.selected {
+            border-color: #007bff;
+            background: #007bff;
+            color: white;
+        }
+        
+        .room-item .room-info {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
         @media (max-width: 768px) {
             .image-container {
                 flex-direction: column;
@@ -315,8 +348,13 @@
                         <div class="detection-info" id="detectionInfo" style="display: none;">
                             <h4>🔍 检测信息</h4>
                             <div>检测方法: <span class="method-used" id="methodUsed"></span></div>
-                            <div>绿色检测: <span id="greenDetection"></span></div>
                             <div class="debug-message" id="debugMessage"></div>
+                            
+                            <div id="roomCandidates" style="display: none; margin-top: 15px;">
+                                <h5>🏠 候选房间</h5>
+                                <div id="roomList" class="room-list"></div>
+                                <p class="hint">点击房间编号切换选择</p>
+                            </div>
                         </div>
                     </div>
 
@@ -369,6 +407,8 @@
                 this.corners = [];
                 this.originalImage = null;
                 this.imageScale = 1;
+                this.roomCandidates = [];
+                this.selectedRoomIndex = 0;
                 
                 this.initializeElements();
                 this.bindEvents();
@@ -573,27 +613,84 @@
                 
                 const detectionDiv = document.getElementById('detectionInfo');
                 const methodUsed = document.getElementById('methodUsed');
-                const greenDetection = document.getElementById('greenDetection');
                 const debugMessage = document.getElementById('debugMessage');
                 
                 // 显示检测方法
                 methodUsed.textContent = this.getMethodName(detectionInfo.method_used);
                 methodUsed.className = 'method-used' + (detectionInfo.method_used === 'fallback' ? ' fallback' : '');
                 
-                // 显示绿色检测状态
-                greenDetection.textContent = detectionInfo.green_detection ? '✅ 成功' : '❌ 未检测到';
-                greenDetection.style.color = detectionInfo.green_detection ? '#28a745' : '#dc3545';
-                
                 // 显示调试信息
                 debugMessage.textContent = detectionInfo.debug_message || '无额外信息';
+                
+                // 处理房间候选
+                this.updateRoomCandidates(detectionInfo.room_candidates || []);
                 
                 // 显示检测信息面板
                 detectionDiv.style.display = 'block';
             }
 
+            updateRoomCandidates(roomCandidates) {
+                const roomCandidatesDiv = document.getElementById('roomCandidates');
+                const roomList = document.getElementById('roomList');
+                
+                if (roomCandidates && roomCandidates.length > 0) {
+                    // 存储候选房间
+                    this.roomCandidates = roomCandidates;
+                    this.selectedRoomIndex = 0; // 默认选择第一个
+                    
+                    // 清空房间列表
+                    roomList.innerHTML = '';
+                    
+                    // 创建房间选项
+                    roomCandidates.forEach((room, index) => {
+                        const roomItem = document.createElement('div');
+                        roomItem.className = 'room-item' + (index === 0 ? ' selected' : '');
+                        roomItem.innerHTML = `
+                            <div>房间 ${index + 1}</div>
+                            <div class="room-info">面积: ${Math.round(room.area)}</div>
+                        `;
+                        
+                        roomItem.addEventListener('click', () => {
+                            this.selectRoom(index);
+                        });
+                        
+                        roomList.appendChild(roomItem);
+                    });
+                    
+                    roomCandidatesDiv.style.display = 'block';
+                } else {
+                    roomCandidatesDiv.style.display = 'none';
+                }
+            }
+
+            selectRoom(roomIndex) {
+                if (!this.roomCandidates || roomIndex >= this.roomCandidates.length) return;
+                
+                // 更新选中状态
+                this.selectedRoomIndex = roomIndex;
+                
+                // 更新UI
+                const roomItems = document.querySelectorAll('.room-item');
+                roomItems.forEach((item, index) => {
+                    if (index === roomIndex) {
+                        item.classList.add('selected');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                });
+                
+                // 更新角点
+                const selectedRoom = this.roomCandidates[roomIndex];
+                this.corners = selectedRoom.corners;
+                
+                // 重新绘制
+                this.drawCorners();
+                this.updateCornerDisplay();
+            }
+
             getMethodName(method) {
                 const methodNames = {
-                    'green_detection': '绿色边框检测',
+                    'room_detection': '智能房间检测',
                     'improved_edges': '改进边缘检测',
                     'contour_area': '轮廓面积过滤',
                     'fallback': '默认角点'
