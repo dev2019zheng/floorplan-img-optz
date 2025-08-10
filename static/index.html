@@ -221,6 +221,35 @@
             font-size: 0.9em;
         }
 
+        .detection-info {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #17a2b8;
+            background: #f8f9fa;
+        }
+
+        .detection-info h4 {
+            margin: 0 0 8px 0;
+            color: #17a2b8;
+            font-size: 1em;
+        }
+
+        .detection-info .method-used {
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .detection-info .method-used.fallback {
+            color: #ffc107;
+        }
+
+        .detection-info .debug-message {
+            margin-top: 5px;
+            font-style: italic;
+            color: #6c757d;
+        }
+
         .instructions {
             background: #e7f3ff;
             border: 1px solid #b8daff;
@@ -281,6 +310,13 @@
                         <div class="corner-info">
                             <strong>检测到的角点坐标：</strong>
                             <div id="cornerCoords">等待图像上传...</div>
+                        </div>
+                        
+                        <div class="detection-info" id="detectionInfo" style="display: none;">
+                            <h4>🔍 检测信息</h4>
+                            <div>检测方法: <span class="method-used" id="methodUsed"></span></div>
+                            <div>绿色检测: <span id="greenDetection"></span></div>
+                            <div class="debug-message" id="debugMessage"></div>
                         </div>
                     </div>
 
@@ -420,6 +456,7 @@
                         this.corners = result.corners;
                         await this.displayOriginalImage(result.image_base64, result.image_size);
                         this.updateCornerDisplay();
+                        this.updateDetectionInfo(result.detection_info);
                         this.showImageSection();
                         this.correctBtn.disabled = false;
                         this.showStatus('success', '图像上传成功，已自动检测角点');
@@ -529,6 +566,39 @@
                     `角点${index + 1}: (${Math.round(corner[0])}, ${Math.round(corner[1])})`
                 );
                 this.cornerCoords.innerHTML = cornerTexts.join('<br>');
+            }
+
+            updateDetectionInfo(detectionInfo) {
+                if (!detectionInfo) return;
+                
+                const detectionDiv = document.getElementById('detectionInfo');
+                const methodUsed = document.getElementById('methodUsed');
+                const greenDetection = document.getElementById('greenDetection');
+                const debugMessage = document.getElementById('debugMessage');
+                
+                // 显示检测方法
+                methodUsed.textContent = this.getMethodName(detectionInfo.method_used);
+                methodUsed.className = 'method-used' + (detectionInfo.method_used === 'fallback' ? ' fallback' : '');
+                
+                // 显示绿色检测状态
+                greenDetection.textContent = detectionInfo.green_detection ? '✅ 成功' : '❌ 未检测到';
+                greenDetection.style.color = detectionInfo.green_detection ? '#28a745' : '#dc3545';
+                
+                // 显示调试信息
+                debugMessage.textContent = detectionInfo.debug_message || '无额外信息';
+                
+                // 显示检测信息面板
+                detectionDiv.style.display = 'block';
+            }
+
+            getMethodName(method) {
+                const methodNames = {
+                    'green_detection': '绿色边框检测',
+                    'improved_edges': '改进边缘检测',
+                    'contour_area': '轮廓面积过滤',
+                    'fallback': '默认角点'
+                };
+                return methodNames[method] || method;
             }
 
             showImageSection() {
